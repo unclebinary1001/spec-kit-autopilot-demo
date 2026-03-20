@@ -1,0 +1,223 @@
+openapi: "3.0.3"
+info:
+  title: Todo List API
+  description: Hono backend API for the Simple Todo List App (Feature #7)
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:3001
+    description: Local development server
+
+tags:
+  - name: todos
+    description: Todo item operations
+
+paths:
+  /api/todos:
+    get:
+      summary: List all todos
+      operationId: listTodos
+      tags: [todos]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter todos by completion status
+          schema:
+            type: string
+            enum: [all, active, completed]
+            default: all
+      responses:
+        "200":
+          description: A list of todos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Todo"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      summary: Create a new todo
+      operationId: createTodo
+      tags: [todos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTodoRequest"
+      responses:
+        "201":
+          description: Todo created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/todos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Numeric ID of the todo
+        schema:
+          type: integer
+          minimum: 1
+
+    get:
+      summary: Get a single todo by ID
+      operationId: getTodo
+      tags: [todos]
+      responses:
+        "200":
+          description: The requested todo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    patch:
+      summary: Update a todo (title and/or completed status)
+      operationId: updateTodo
+      tags: [todos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTodoRequest"
+      responses:
+        "200":
+          description: Updated todo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      summary: Delete a todo
+      operationId: deleteTodo
+      tags: [todos]
+      responses:
+        "204":
+          description: Todo deleted successfully
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  schemas:
+    Todo:
+      type: object
+      required: [id, title, completed, createdAt]
+      properties:
+        id:
+          type: integer
+          description: Unique identifier
+          example: 1
+        title:
+          type: string
+          description: Todo item text
+          minLength: 1
+          maxLength: 500
+          example: "Buy groceries"
+        completed:
+          type: boolean
+          description: Whether the todo is completed
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 creation timestamp (UTC)
+          example: "2026-03-20T14:00:00Z"
+
+    CreateTodoRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: "Buy groceries"
+
+    UpdateTodoRequest:
+      type: object
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: "Buy groceries (updated)"
+        completed:
+          type: boolean
+          example: true
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+          example: "Title is required"
+        details:
+          type: array
+          description: Optional field-level validation details
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Todo not found"
+
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Validation failed"
+            details:
+              - field: "title"
+                message: "Title is required"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Internal server error"
