@@ -25,6 +25,36 @@ safe-outputs:
     title-prefix: "[speckit] "
     labels:
       - speckit
+    allowed-files:
+      - package.json
+      - package-lock.json
+      - yarn.lock
+      - pnpm-lock.yaml
+      - npm-shrinkwrap.json
+      - pyproject.toml
+      - setup.py
+      - setup.cfg
+      - requirements.txt
+      - Pipfile
+      - Pipfile.lock
+      - uv.lock
+      - go.mod
+      - go.sum
+      - Gemfile
+      - Gemfile.lock
+      - bun.lockb
+      - bunfig.toml
+      - deno.json
+      - deno.jsonc
+      - deno.lock
+      - mix.exs
+      - mix.lock
+      - pom.xml
+      - build.gradle
+      - build.gradle.kts
+      - settings.gradle
+      - settings.gradle.kts
+      - gradle.properties
 concurrency:
   group: speckit-impl-${{ github.event.issue.number }}
   cancel-in-progress: false
