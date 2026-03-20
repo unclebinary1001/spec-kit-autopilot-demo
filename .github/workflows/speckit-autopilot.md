@@ -67,9 +67,9 @@ Structure:
 
 ### Step 2: Feature Specification
 
-Derive a short feature slug from the issue title (lowercase, hyphenated, e.g., `cli-todo-app`).
+Derive a short feature slug from the issue title (lowercase, hyphenated, e.g., `cli-todo-app`). The feature directory name is `${{ github.event.issue.number }}-<feature-slug>` (e.g., `${{ github.event.issue.number }}-cli-todo-app`).
 
-Create `.specify/features/<feature-slug>/spec.md` with:
+Create `specs/${{ github.event.issue.number }}-<feature-slug>/spec.md` with:
 
 - **User Scenarios & Testing**: Prioritized user stories (P1, P2, P3...) — each independently testable
   - Per story: plain-language description, priority justification, independent test description, acceptance scenarios (Given/When/Then)
@@ -79,9 +79,18 @@ Create `.specify/features/<feature-slug>/spec.md` with:
 
 Each user story must be a standalone slice of functionality that delivers value independently.
 
+### Step 2.5: Clarify
+
+Before planning, review the spec you just wrote and identify any underspecified areas. For each ambiguity:
+- State the unclear requirement
+- Make a reasonable, explicit decision based on what the issue implies
+- Document your decision as a note at the top of the spec under a `## Clarifications` section
+
+Only proceed to Step 3 after all ambiguities are resolved — do not carry "NEEDS CLARIFICATION" placeholders into the plan.
+
 ### Step 3: Implementation Plan
 
-Create `.specify/features/<feature-slug>/plan.md` with:
+Create `specs/${{ github.event.issue.number }}-<feature-slug>/plan.md` with:
 
 - **Summary**: Primary requirement + technical approach
 - **Technical Context**: Language/version, dependencies, storage, testing framework, target platform, performance goals, constraints
@@ -91,7 +100,7 @@ Create `.specify/features/<feature-slug>/plan.md` with:
 
 ### Step 4: Task Breakdown
 
-Create `.specify/features/<feature-slug>/tasks.md` with:
+Create `specs/${{ github.event.issue.number }}-<feature-slug>/tasks.md` with:
 
 - **Phase 1 — Setup**: Project structure, dependency initialization, tooling config
 - **Phase 2 — Foundational**: Core infrastructure that BLOCKS all user stories (database, auth, routing, base models)
@@ -106,10 +115,21 @@ Task format: `- [ ] T001 [P] [US1] Description with exact file paths`
 - `[P]` = parallelizable (different files, no dependencies)
 - `[US1]` = which user story this belongs to
 
+### Step 4.5: Analyze
+
+After writing tasks, perform a cross-artifact consistency check across all four artifacts:
+
+1. **Spec → Plan traceability**: Every functional requirement (FR-001, FR-002...) in the spec must be addressed in the plan. Flag any gaps.
+2. **Plan → Tasks traceability**: Every component or layer defined in the plan must have corresponding tasks. Flag any unimplemented pieces.
+3. **User story coverage**: Every user story (US1, US2...) in the spec must have at least one task phase. Flag any stories with no tasks.
+4. **Constitution compliance**: Verify each task phase doesn't violate a constitution principle.
+
+If you find gaps, fix them by updating the relevant artifact before creating the PR.
+
 ## Output Rules
 
 - Write ALL artifacts using the `edit` tool — do not just print their contents
-- Use the directory structure: `.specify/constitution.md` and `.specify/features/<feature-slug>/`
-- Every artifact must be complete — no TODOs, no placeholders, no "fill in later"
+- Constitution: `.specify/constitution.md` | Feature artifacts: `specs/${{ github.event.issue.number }}-<feature-slug>/`
+- Every artifact must be complete — no TODOs, no unresolved placeholders
 - Cross-reference user stories consistently: spec (P1/P2/P3) → plan → tasks (US1/US2/US3)
 - Base all content on the issue requirements — do not invent features the user did not ask for

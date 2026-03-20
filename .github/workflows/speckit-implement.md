@@ -43,12 +43,12 @@ Someone commented `/implement` on a pull request that contains spec-kit artifact
 
 ### Step 1: Read the Spec Artifacts
 
-Find and read ALL spec-kit artifacts from the `.specify/` directory:
+Find and read ALL spec-kit artifacts from the repository:
 
 1. **`.specify/constitution.md`** — Project principles and constraints (your guardrails)
-2. **`.specify/features/*/spec.md`** — Feature specification with user stories and requirements
-3. **`.specify/features/*/plan.md`** — Implementation plan with architecture and project structure
-4. **`.specify/features/*/tasks.md`** — Ordered task breakdown
+2. **`specs/*/spec.md`** — Feature specification with user stories and requirements
+3. **`specs/*/plan.md`** — Implementation plan with architecture and project structure
+4. **`specs/*/tasks.md`** — Ordered task breakdown
 
 Read every file carefully before writing any code. The constitution defines your constraints, the spec defines _what_ to build, the plan defines _how_, and the tasks define _in what order_.
 
@@ -81,7 +81,7 @@ After implementing all tasks:
 
 - Write ALL code using the `edit` tool
 - Follow the directory structure from `plan.md` exactly
-- Do **not** modify spec artifacts in `.specify/` — they are read-only inputs
+- Do **not** modify spec artifacts in `.specify/` or `specs/` — they are read-only inputs
 - Complete **all tasks** in `tasks.md` — do not stop partway through
 - If a task is ambiguous, make a reasonable decision consistent with the spec and plan
 - Commit messages should reference the task ID (e.g., "T001: Create project structure")
