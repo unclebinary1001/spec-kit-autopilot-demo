@@ -4,7 +4,7 @@ description: "Implement code based on spec-kit artifacts when /implement is comm
 on:
   slash_command:
     name: implement
-    events: [pull_request_comment]
+    events: [pull_request_comment, issue_comment]
   reaction: "rocket"
 engine: copilot
 tools:

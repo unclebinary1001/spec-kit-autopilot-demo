@@ -22,7 +22,7 @@
 #
 # Implement code based on spec-kit artifacts when /implement is commented on a PR
 #
-# gh-aw-metadata: {"schema_version":"v2","frontmatter_hash":"6a4155614e4a033e6edcdcd7bb434807643eabd3fef3a7b0bd5ff7efa801f04b","compiler_version":"v0.62.2","strict":true}
+# gh-aw-metadata: {"schema_version":"v2","frontmatter_hash":"bd9029be4ba256f9296fe5a07a1d62047eb694a3dc651a97b23aeb41cfa17698","compiler_version":"v0.62.2","strict":true}
 
 name: "Spec Kit Implement"
 "on":
@@ -44,7 +44,9 @@ jobs:
     needs: pre_activation
     if: >
       (needs.pre_activation.outputs.activated == 'true') && ((github.event_name == 'issue_comment') && (((startsWith(github.event.comment.body, '/implement ')) ||
-      (github.event.comment.body == '/implement')) && (github.event.issue.pull_request != null)))
+      (github.event.comment.body == '/implement')) && (github.event.issue.pull_request == null)) || (github.event_name == 'issue_comment') &&
+      (((startsWith(github.event.comment.body, '/implement ')) || (github.event.comment.body == '/implement')) &&
+      (github.event.issue.pull_request != null)))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -1010,7 +1012,9 @@ jobs:
   pre_activation:
     if: >
       (github.event_name == 'issue_comment') && (((startsWith(github.event.comment.body, '/implement ')) ||
-      (github.event.comment.body == '/implement')) && (github.event.issue.pull_request != null))
+      (github.event.comment.body == '/implement')) && (github.event.issue.pull_request == null)) || (github.event_name == 'issue_comment') &&
+      (((startsWith(github.event.comment.body, '/implement ')) || (github.event.comment.body == '/implement')) &&
+      (github.event.issue.pull_request != null))
     runs-on: ubuntu-slim
     outputs:
       activated: ${{ (steps.check_membership.outputs.is_team_member == 'true') && (steps.check_command_position.outputs.command_position_ok == 'true') }}
