@@ -23,6 +23,7 @@ steps:
 permissions:
   contents: read
   issues: read
+  pull-requests: read
 network:
   allowed:
     - defaults
@@ -33,6 +34,7 @@ safe-outputs:
     labels:
       - speckit
       - spec-artifacts
+    fallback-as-issue: true
 concurrency:
   group: speckit-${{ github.event.issue.number }}
   cancel-in-progress: false
