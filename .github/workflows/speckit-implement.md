@@ -23,8 +23,6 @@ network:
 safe-outputs:
   push-to-pull-request-branch:
     title-prefix: "[speckit] "
-    labels:
-      - speckit
     protected-files: allowed
     if-no-changes: ignore
 concurrency:
