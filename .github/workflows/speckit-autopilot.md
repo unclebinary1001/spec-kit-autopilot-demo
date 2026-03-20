@@ -90,15 +90,38 @@ Only proceed to Step 3 after all ambiguities are resolved — do not carry "NEED
 
 ### Step 3: Implementation Plan
 
-Create `specs/${{ github.event.issue.number }}-<feature-slug>/plan.md` with:
+Create ALL of the following in `specs/${{ github.event.issue.number }}-<feature-slug>/`:
 
+**`plan.md`**:
 - **Summary**: Primary requirement + technical approach
 - **Technical Context**: Language/version, dependencies, storage, testing framework, target platform, performance goals, constraints
 - **Constitution Check**: Verify the plan respects every constitution principle — list each principle and how this plan complies
 - **Project Structure**: Concrete directory layouts for both documentation (`specs/`) and source code (`src/`, `tests/`)
 - **Complexity Tracking**: Flag any constitution violations with justification; leave empty if fully compliant
 
+**`research.md`**:
+- Compare the key library/framework options required by this feature (e.g., ORMs, auth libraries, messaging clients)
+- For each option: summary, pros/cons, compatibility with the constitution's tech constraints, and final recommendation
+- Document any organizational or environmental constraints that influenced the decision
+
+**`data-model.md`**:
+- All entities/tables referenced in the spec with field names, types, constraints, and relationships
+- Any indexing strategy and migration considerations
+- Diagrammatic representation (e.g., simple ASCII ERD) if helpful
+
+**`contracts/api.yaml`** (OpenAPI 3.0 format, or a Markdown equivalent if no HTTP API applies):
+- Every API surface exposed by this feature: endpoints, methods, request/response schemas, error codes
+- Authentication/authorization requirements per endpoint
+- If the feature is purely internal/CLI with no HTTP API, create `contracts/events.md` listing all internal events or CLI contracts instead
+
+**`quickstart.md`**:
+- The minimal end-to-end steps to run and manually verify the feature
+- Maps directly to the acceptance scenarios defined in `spec.md`
+- Prerequisites, setup commands, and expected outputs
+
 ### Step 4: Task Breakdown
+
+First read `plan.md`, `data-model.md`, `research.md`, and any files under `contracts/` you just created — use them to derive concrete tasks.
 
 Create `specs/${{ github.event.issue.number }}-<feature-slug>/tasks.md` with:
 
@@ -117,19 +140,54 @@ Task format: `- [ ] T001 [P] [US1] Description with exact file paths`
 
 ### Step 4.5: Analyze
 
-After writing tasks, perform a cross-artifact consistency check across all four artifacts:
+After writing tasks, perform a cross-artifact consistency check across all artifacts:
 
 1. **Spec → Plan traceability**: Every functional requirement (FR-001, FR-002...) in the spec must be addressed in the plan. Flag any gaps.
 2. **Plan → Tasks traceability**: Every component or layer defined in the plan must have corresponding tasks. Flag any unimplemented pieces.
-3. **User story coverage**: Every user story (US1, US2...) in the spec must have at least one task phase. Flag any stories with no tasks.
-4. **Constitution compliance**: Verify each task phase doesn't violate a constitution principle.
+3. **Data model coverage**: Every entity in `data-model.md` must have corresponding tasks (schema creation, migrations, model files). Flag any orphaned entities.
+4. **Contract coverage**: Every endpoint or event in `contracts/` must have corresponding tasks (handler, test). Flag any uncovered contracts.
+5. **User story coverage**: Every user story (US1, US2...) in the spec must have at least one task phase. Flag any stories with no tasks.
+6. **Constitution compliance**: Verify each task phase doesn't violate a constitution principle.
 
-If you find gaps, fix them by updating the relevant artifact before creating the PR.
+If you find gaps, fix them by updating the relevant artifact before proceeding.
+
+### Step 5: Requirements Checklist
+
+Create `specs/${{ github.event.issue.number }}-<feature-slug>/checklists/requirements.md` — a quality checklist that acts as "unit tests for English" on the full artifact set:
+
+**Specification Quality**:
+- [ ] No `[NEEDS CLARIFICATION]` markers remain anywhere
+- [ ] Every user story has at least one Given/When/Then acceptance scenario
+- [ ] All success criteria (SC-001...) are measurable and verifiable
+- [ ] No speculative or "might need" features included
+
+**Plan Completeness**:
+- [ ] Every functional requirement (FR-001...) is addressed in the plan
+- [ ] All constitution principles are listed with explicit compliance notes
+- [ ] `research.md` provides a clear final recommendation for each decision
+- [ ] `data-model.md` covers all entities mentioned in the spec
+- [ ] `contracts/` covers all API surfaces mentioned in the plan
+
+**Tasks Readiness**:
+- [ ] Every contract endpoint/event has a corresponding task
+- [ ] Every data model entity has a corresponding schema/migration task
+- [ ] Every user story has at least one task phase
+- [ ] Phase ordering respects dependencies (foundational before feature phases)
+- [ ] All tasks have exact file paths
+
+**Cross-Artifact Consistency**:
+- [ ] User story IDs are consistent across spec (P1/P2...) → plan → tasks (US1/US2...)
+- [ ] Requirement IDs (FR-001...) are consistent across spec and plan
+- [ ] Technology choices in plan match recommendations in research.md
 
 ## Output Rules
 
 - Write ALL artifacts using the `edit` tool — do not just print their contents
-- Constitution: `.specify/constitution.md` | Feature artifacts: `specs/${{ github.event.issue.number }}-<feature-slug>/`
+- Constitution: `.specify/constitution.md`
+- Feature artifacts (all under `specs/${{ github.event.issue.number }}-<feature-slug>/`):
+  - `spec.md`, `plan.md`, `tasks.md`, `research.md`, `data-model.md`, `quickstart.md`
+  - `contracts/api.yaml` (or `contracts/events.md` for non-HTTP features)
+  - `checklists/requirements.md`
 - Every artifact must be complete — no TODOs, no unresolved placeholders
 - Cross-reference user stories consistently: spec (P1/P2/P3) → plan → tasks (US1/US2/US3)
 - Base all content on the issue requirements — do not invent features the user did not ask for
