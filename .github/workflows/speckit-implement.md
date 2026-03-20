@@ -26,9 +26,10 @@ safe-outputs:
     labels:
       - speckit
     protected-files: allowed
+    if-no-changes: ignore
 concurrency:
   group: speckit-impl-${{ github.event.issue.number }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 timeout-minutes: 45
 ---
 
