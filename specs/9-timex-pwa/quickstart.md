@@ -70,6 +70,11 @@ QBO_TOKEN_ENCRYPTION_KEY=<generate: openssl rand -hex 32>
 QBO_REDIRECT_URI=http://localhost:3000/api/org/lets-thrive/admin/quickbooks/callback
 QBO_ENVIRONMENT=sandbox
 
+# Web Push (VAPID)
+VAPID_PUBLIC_KEY=<generate: npx web-push generate-vapid-keys>
+VAPID_PRIVATE_KEY=<generated with above>
+VAPID_SUBJECT=mailto:admin@yourdomain.com
+
 # New Relic (production only — leave empty for local dev)
 NEW_RELIC_LICENSE_KEY=
 NEW_RELIC_APP_NAME=timex-local
@@ -106,6 +111,8 @@ Expected output:
     employee2@letsthrive.com (employee)
 ✓ Seeded pay period: 2026-03-01 → 2026-03-31
 ✓ Seeded clients: Maria Santos, Robert Chen, Grace Williams
+✓ Seeded tenant: Test Corp (test-corp) — isolation testing
+✓ Seeded user: testuser@testcorp.com (admin) — isolation testing
 ```
 
 ---
@@ -264,10 +271,21 @@ TOKEN_A=$(curl -s -X POST http://localhost:3000/api/auth/login \
   -d '{"email":"employee1@letsthrive.com","password":"password123","slug":"lets-thrive"}' \
   | jq -r '.accessToken')
 
-# Attempt to access a different tenant's data (create a second test tenant first)
+# Attempt to access Test Corp's data with Let's Thrive token
 curl -H "Authorization: Bearer $TOKEN_A" \
-  http://localhost:3000/api/org/other-tenant/timesheets
+  http://localhost:3000/api/org/test-corp/timesheets
 # Expected: 403 Forbidden
+
+# Log in as tenant B user (test-corp) and verify data isolation
+TOKEN_B=$(curl -s -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"testuser@testcorp.com","password":"password123","slug":"test-corp"}' \
+  | jq -r '.accessToken')
+
+# Verify Test Corp sees no Let's Thrive data
+curl -H "Authorization: Bearer $TOKEN_B" \
+  http://localhost:3000/api/org/test-corp/timesheets
+# Expected: 200 with empty timesheets array (Test Corp has no timesheets)
 ```
 
 ---
@@ -302,3 +320,27 @@ pnpm build
 pnpm lint
 # Expected: Zero errors, zero warnings
 ```
+
+---
+
+## Troubleshooting
+
+### Neon connection refused
+**Symptom:** `Error: connect ECONNREFUSED` or `SSL required`
+**Fix:** Verify `DATABASE_URL` includes `?sslmode=require`. Check Neon dashboard → project isn't suspended. If using a branch, confirm the branch exists.
+
+### Resend magic link email not arriving
+**Symptom:** Login form says "link sent" but no email received.
+**Fix:** Check Resend dashboard for delivery logs. Verify `FROM_EMAIL` domain is verified in Resend. For local dev, query `magic_link_tokens` table directly (see US1 verification).
+
+### S3 presigned URL 403
+**Symptom:** Receipt upload fails with 403 from S3.
+**Fix:** Verify S3 bucket CORS allows `PUT` from `http://localhost:5173`. Check IAM user has `s3:PutObject` and `s3:GetObject` permissions. Verify bucket name matches `S3_BUCKET_NAME`.
+
+### RabbitMQ connection timeout
+**Symptom:** `Error: connect ETIMEDOUT` on AMQP connection.
+**Fix:** CloudAMQP free tier allows 1 connection. If dev server + worker both connect, one will be rejected. Use `docker run -d -p 5672:5672 -p 15672:15672 rabbitmq:3-management` for local dev instead.
+
+### `btree_gist` extension error on `db:reset`
+**Symptom:** `ERROR: type "daterange" does not exist` or `ERROR: extension "btree_gist" is not available`.
+**Fix:** Neon supports `btree_gist` on all plans. If running local Postgres, install `postgresql-contrib` package.

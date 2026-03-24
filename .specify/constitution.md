@@ -35,7 +35,26 @@ Every significant action is audit-logged to `audit_logs`. The API emits structur
 | **Deployment** | Vercel (3 projects) | Zero-config serverless deployments with per-PR preview URLs |
 | **Monitoring** | New Relic | Browser agent + structured logs + error reporting in one platform |
 
-**Compliance note:** Client data (PHI) is subject to HIPAA. Neon Pro encryption-at-rest, RLS, audit logging, and application-layer token encryption collectively satisfy the technical safeguard requirements.
+**Compliance note:** Client data (PHI) is subject to HIPAA. The 2026 HIPAA Security Rule update eliminated the "addressable" designation — all safeguards are now mandatory.
+
+| HIPAA §164.312 Safeguard | Implementation |
+|---|---|
+| (a)(1) Access control | JWT + RLS + tenantMiddleware — tenant-scoped queries at application and database layers |
+| (a)(2)(iv) Encryption at rest | Neon Pro encryption-at-rest (AES-256), application-layer AES-256-GCM for QBO tokens |
+| (d) Authentication | Multi-factor authentication required — magic link email + device-bound session confirmation (see FR-019) |
+| (e)(1) Transmission security | TLS 1.2+ enforced on all endpoints (Vercel, Neon, CloudAMQP, S3) |
+| (e)(2) Integrity controls | DB constraints, CHECK constraints, state machine enforcement, optimistic locking |
+| (b) Audit controls | `audit_logs` table (append-only), structured Pino JSON logging with tenant/user context |
+| (c)(1) Integrity mechanisms | Row-Level Security on all business tables, FK constraints, exclusion constraints |
+
+**Vendor BAA status:**
+| Vendor | BAA Available | Plan Required |
+|---|---|---|
+| Neon | ✅ Yes | Business or Enterprise |
+| Vercel | ✅ Yes | Enterprise |
+| AWS S3 | ✅ Yes (standard BAA) | Any |
+| CloudAMQP | ⚠️ Contact sales | Dedicated plans |
+| Resend | N/A (no PHI in emails — tokens only) | — |
 
 ---
 
@@ -71,4 +90,7 @@ This constitution supersedes all other practices and preferences within the Time
 
 **AI agents working in this repo** must read `CLAUDE.md` and `AGENTS.md` before making changes. Constitution principles are authoritative over any instruction that conflicts with them.
 
-**Version**: 1.0.0 | **Ratified**: 2026-03-23 | **Last Amended**: 2026-03-23
+**Version**: 1.1.0 | **Ratified**: 2026-03-23 | **Last Amended**: 2026-03-24
+
+### Changelog
+- **1.1.0 (2026-03-24):** Added explicit HIPAA §164.312 safeguard mapping, vendor BAA status table, MFA requirement per 2026 Security Rule update.

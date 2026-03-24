@@ -242,6 +242,132 @@ This document evaluates key library and framework choices for the TimeX platform
 
 ---
 
+## 7. Form Handling: React Hook Form vs Formik vs Native
+
+### React Hook Form
+**Summary:** Performant, hook-based form library with minimal re-renders and built-in validation.
+
+**Pros:**
+- Tiny bundle (~8KB gzipped); fits the FCP < 3s performance budget
+- Uncontrolled inputs by default — minimal re-renders on large forms (timesheet entries)
+- First-class Zod integration via `@hookform/resolvers` for schema-based validation
+- Excellent TypeScript support with inferred form types
+
+**Cons:**
+- Uncontrolled approach can be unfamiliar to developers used to controlled inputs
+
+### Formik
+**Summary:** Popular form library with controlled input model.
+
+**Pros:**
+- Large community, extensive documentation
+
+**Cons:**
+- ~15KB gzipped; heavier than React Hook Form
+- Controlled inputs cause re-renders on every keystroke — problematic for timesheet entry forms with many fields
+- Yup integration (not Zod) — adds another validation library
+
+**Decision: React Hook Form** — best performance/bundle-size ratio for mobile-first PWA with many form-heavy screens. Zod resolver enables shared validation schemas between frontend and API.
+
+---
+
+## 8. Validation: Zod vs Valibot vs Joi
+
+### Zod
+**Summary:** TypeScript-first schema validation library. Compiles to types and validates at runtime.
+
+**Pros:**
+- Infers TypeScript types from schemas — single source of truth for types and validation
+- Integrates with Drizzle (`drizzle-zod`) to generate Zod schemas from DB schema
+- Integrates with React Hook Form via `@hookform/resolvers/zod`
+- Works on both frontend and API — shared validation in `@timex/domain`
+
+**Cons:**
+- ~13KB gzipped; larger than Valibot
+
+### Valibot
+**Summary:** Ultra-lightweight validation library (~1KB gzipped) with tree-shakeable API.
+
+**Pros:**
+- Smallest bundle size of any validation library
+
+**Cons:**
+- Smaller ecosystem; no `drizzle-valibot` equivalent
+- Less mature TypeScript inference
+
+**Decision: Zod** — the Drizzle + React Hook Form + Hono ecosystem all have first-class Zod support. `drizzle-zod` generates Zod schemas from the Drizzle schema, creating a single type/validation chain from DB → API → frontend.
+
+---
+
+## 9. Date/Time: date-fns vs Day.js vs Native Intl
+
+### date-fns
+**Summary:** Modular, tree-shakeable date utility library.
+
+**Pros:**
+- Tree-shakeable — only import functions used (typically 2-5KB total for date formatting + comparison)
+- Pure functions, immutable — no global state issues in serverless
+- Covers all TimeX needs: `format`, `isWithinInterval`, `differenceInDays`, `startOfWeek`
+
+**Cons:**
+- Many small imports can be verbose
+
+### Day.js
+**Summary:** Lightweight Moment.js replacement (~2KB core).
+
+**Pros:**
+- Small core, familiar Moment-like API
+
+**Cons:**
+- Plugin system adds complexity for timezone/locale support
+- Mutable by default; `.clone()` needed for immutability
+
+**Decision: date-fns** — tree-shaking keeps bundle small, pure functions align with serverless and React patterns, and covers all pay period/work date calculations.
+
+---
+
+## 10. Rate Limiting: hono-rate-limiter vs Custom Middleware
+
+### hono-rate-limiter (rhinobase)
+**Summary:** Express-style rate limiting middleware for Hono with pluggable stores.
+
+**Pros:**
+- Drop-in Hono middleware; supports per-route configuration
+- Multiple store backends: memory (development), Vercel KV (production), Redis
+- Configurable window, max requests, key generator (by IP, by user, by IP+email)
+
+**Cons:**
+- In-memory store doesn't share state across Vercel serverless instances — Vercel KV or Redis required for production
+
+### Custom Middleware
+**Pros:**
+- No dependency
+**Cons:**
+- Must implement sliding window, key generation, and distributed state from scratch
+
+**Decision: hono-rate-limiter** — proven middleware with Vercel KV store for distributed rate limiting across serverless instances. Apply to all auth endpoints with per-route limits.
+
+---
+
+## Version Compatibility Matrix
+
+| Library | Version | Node.js | TypeScript | Notes |
+|---|---|---|---|---|
+| React | 19.x | — | 5.x | React 19 requires TS 5.x |
+| Vite | 5.x | 20+ | 5.x | |
+| Hono | 4.x | 18+ | 5.x | |
+| Drizzle ORM | 0.36+ | 18+ | 5.x | Native Neon serverless driver support |
+| TanStack Query | 5.x | — | 5.x | |
+| React Router | 6.x | — | 5.x | |
+| Playwright | 1.48+ | 18+ | — | WebKit support for iOS PWA testing |
+| Zod | 3.23+ | — | 5.x | `drizzle-zod` compat |
+| React Hook Form | 7.53+ | — | 5.x | Zod resolver support |
+| date-fns | 4.x | — | 5.x | ESM-only in v4 |
+| hono-rate-limiter | 0.4+ | 18+ | 5.x | Vercel KV store support |
+| web-push | 3.6+ | 16+ | — | VAPID support |
+
+---
+
 ## Organizational Constraints
 
 - **HIPAA**: All external services (Neon, Vercel, AWS, CloudAMQP) must have BAA agreements in place before storing PHI. Resend is used for magic links only (no PHI in email body — tokens only).

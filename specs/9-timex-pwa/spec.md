@@ -171,12 +171,30 @@ TimeX is a multi-tenant time and expense tracking platform for home health care 
 | FR-016 | `CLAUDE.md` and `AGENTS.md` must exist at repo root with substantive content for AI agents |
 | FR-017 | CI must create a Neon preview branch per PR and delete it on PR close |
 | FR-018 | All three Vercel projects must deploy with preview URLs on every PR |
+| FR-019 | All users accessing ePHI must authenticate with multi-factor authentication — magic link email serves as first factor; a device-bound session confirmation (TOTP or trusted-device token stored in httpOnly cookie) serves as second factor. Required by HIPAA §164.312(d) (2026 Security Rule) |
+| FR-020 | Password login must be rate-limited to 5 attempts per email per 15-minute window. After 10 consecutive failed attempts, the account is temporarily locked for 30 minutes. Rate limit state stored via `hono-rate-limiter` with Vercel KV or in-memory store |
+| FR-021 | All auth endpoints (`/auth/login`, `/auth/refresh`, `/auth/switch-tenant`) must return 429 when rate limits are exceeded |
+| FR-022 | Expired magic link tokens (>1 hour) and expired OAuth states (>30 minutes) must be purged by a scheduled cleanup job |
+| FR-023 | Audit logs must be retained for a minimum of 6 years per HIPAA §164.530(j) |
+| FR-024 | The Employee PWA must meet WCAG 2.1 Level AA accessibility standards |
+
+### Non-Functional Requirements
+
+| ID | Requirement |
+|---|---|
+| NFR-001 | Employee PWA must meet WCAG 2.1 Level AA accessibility standards |
+| NFR-002 | API p95 response latency < 500ms under 100 concurrent users per tenant |
+| NFR-003 | Audit logs retained for minimum 6 years (HIPAA §164.530(j)) |
+| NFR-004 | System availability target: 99.5% uptime (measured monthly) |
+| NFR-005 | Support English (en-US) with i18n framework scaffolded for future Spanish (es) localization |
+| NFR-006 | Frontend bundle size (gzipped) must not exceed 250KB to maintain FCP < 3s on 3G |
+| NFR-007 | Neon connection pool limited to plan ceiling; API must handle pool exhaustion gracefully (503 with retry-after) |
 
 ### Key Entities
 
 - `tenants`, `profiles`, `user_tenant_roles`, `pay_periods`, `clients`, `assignments`
 - `timesheets`, `timesheet_entries`, `expenses`
-- `qbo_credentials`, `oauth_states`, `push_subscriptions`, `audit_logs`
+- `qbo_credentials`, `oauth_states`, `push_subscriptions`, `audit_logs`, `magic_link_tokens`
 
 ---
 
@@ -201,17 +219,20 @@ TimeX is a multi-tenant time and expense tracking platform for home health care 
 
 ## Edge Cases
 
-| # | Scenario | Expected Behaviour |
-|---|---|---|
-| EC-001 | Employee submits a timesheet for a pay period that is `locked` | API returns 422 "Pay period is locked" |
-| EC-002 | Employee adds a timesheet entry with `hours = 0` | API returns 422 "Hours must be greater than 0" (DB check constraint) |
-| EC-003 | Magic link token used after 15-minute expiry | API returns 401 "Link expired"; token is deleted |
-| EC-004 | QBO refresh token expires (>100 days since last refresh) | API returns 503 to the sync consumer; admin is notified via audit log to reconnect |
-| EC-005 | S3 presigned download request for a key in a different tenant's prefix | API returns 403 "Access denied" without signing the URL |
-| EC-006 | Two overlapping pay periods created for the same tenant | DB exclusion constraint returns a 409 conflict |
-| EC-007 | Push notification subscription token is stale/revoked | Web Push returns 410; the `push_subscriptions` row is deleted automatically |
-| EC-008 | A user belongs to two tenants and logs in via magic link | After JWT issuance, a tenant picker modal is shown; JWT is re-issued for selected tenant |
-| EC-009 | QBO sync consumer receives a message for a tenant with no `qbo_credentials` | Message is dead-lettered; error logged with `tenantId` for investigation |
-| EC-010 | Employee attempts to upload a receipt > 10 MB | Frontend validates before requesting presigned URL; API enforces via S3 bucket policy |
-| EC-011 | Neon preview branch migration fails in CI | PR deployment is blocked; API deploy step does not proceed |
-| EC-012 | Admin disconnects QBO while a sync message is in-flight in RabbitMQ | Consumer checks for `qbo_credentials` before sync; if absent, nacks and dead-letters |
+| # | Scenario | Expected Behaviour | Protects |
+|---|---|---|---|
+| EC-001 | Employee submits a timesheet for a pay period that is `locked` | API returns 422 "Pay period is locked" | FR-009, US3 |
+| EC-002 | Employee adds a timesheet entry with `hours = 0` | API returns 422 "Hours must be greater than 0" (DB check constraint) | FR-008, US3 |
+| EC-003 | Magic link token used after 15-minute expiry | API returns 401 "Link expired"; token is deleted | FR-003, US1 |
+| EC-004 | QBO refresh token expires (>100 days since last refresh) | API returns 503 to the sync consumer; admin is notified via audit log to reconnect | FR-007, US7 |
+| EC-005 | S3 presigned download request for a key in a different tenant's prefix | API returns 403 "Access denied" without signing the URL | FR-006, US5 |
+| EC-006 | Two overlapping pay periods created for the same tenant | DB exclusion constraint returns a 409 conflict | US10 |
+| EC-007 | Push notification subscription token is stale/revoked | Web Push returns 410; the `push_subscriptions` row is deleted automatically | FR-015, US9 |
+| EC-008 | A user belongs to two tenants and logs in via magic link | After JWT issuance, a tenant picker modal is shown; JWT is re-issued for selected tenant | US1 |
+| EC-009 | QBO sync consumer receives a message for a tenant with no `qbo_credentials` | Message is dead-lettered; error logged with `tenantId` for investigation | FR-014, US7 |
+| EC-010 | Employee attempts to upload a receipt > 10 MB | Frontend validates before requesting presigned URL; API enforces via S3 bucket policy | FR-005, US5 |
+| EC-011 | Neon preview branch migration fails in CI | PR deployment is blocked; API deploy step does not proceed | FR-017 |
+| EC-012 | Admin disconnects QBO while a sync message is in-flight in RabbitMQ | Consumer checks for `qbo_credentials` before sync; if absent, nacks and dead-letters | FR-010, US7 |
+| EC-013 | Password brute force — 10+ failed attempts for same email | Account temporarily locked for 30 minutes; API returns 429 | FR-020, US2 |
+| EC-014 | Expired magic link tokens accumulate in database | Scheduled cleanup job purges tokens older than 1 hour every hour | FR-022 |
+| EC-015 | Employee attempts to access pay period list | Non-admin endpoint returns only `open` pay periods for the tenant | US3 |

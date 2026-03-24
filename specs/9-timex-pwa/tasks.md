@@ -32,7 +32,7 @@
 - [ ] T010 [P] Add Drizzle ORM + Neon serverless driver to `apps/api/` — install `drizzle-orm`, `@neondatabase/serverless`, `drizzle-kit`; configure `drizzle.config.ts` (`apps/api/drizzle.config.ts`, `apps/api/src/db/client.ts`)
 - [ ] T011 Write Drizzle schema for all 13 tables — `apps/api/src/db/schema.ts` covering tenants, profiles, user_tenant_roles, pay_periods, clients, assignments, timesheets, timesheet_entries, expenses, push_subscriptions, qbo_credentials, audit_logs, oauth_states with all constraints, indexes, and relations
 - [ ] T012 Create raw SQL migration for `btree_gist` extension and all RLS policies — `apps/api/src/db/migrations/0001_enable_rls.sql` (all ALTER TABLE ENABLE ROW LEVEL SECURITY + CREATE POLICY statements for all business tables)
-- [ ] T013 Create `scripts/seed.ts` — seed Let's Thrive tenant, 4 users (admin, manager, 2 employees), current month pay period, 3 clients, assignments for both employees to all clients (`scripts/seed.ts`)
+- [ ] T013 Create `scripts/seed.ts` — seed Let's Thrive tenant, 4 users (admin, manager, 2 employees), current month pay period, 3 clients, assignments for both employees to all clients. Also seed Test Corp tenant with 1 admin user for isolation testing (`scripts/seed.ts`)
 - [ ] T014 Add `pnpm db:reset` script — chains `drizzle-kit migrate` + raw SQL migration + `tsx scripts/seed.ts` (`package.json`)
 - [ ] T015 Write Vitest unit tests for schema constraints — test that duplicate `(tenant_id, employee_id, pay_period_id)` timesheets are rejected, overlapping pay periods are rejected, hours <= 0 are rejected (`apps/api/src/db/schema.test.ts`)
 
@@ -67,6 +67,7 @@
 - [ ] T027 Implement `POST /api/auth/refresh` — validate httpOnly refresh cookie, issue new access token (`apps/api/src/routes/auth.ts`)
 - [ ] T028 Implement `POST /api/auth/logout` — clear httpOnly refresh cookie (`apps/api/src/routes/auth.ts`)
 - [ ] T029 Implement `POST /api/auth/switch-tenant` — validate user belongs to requested tenant, re-issue JWT with new `active_tenant_id` (`apps/api/src/routes/auth.ts`)
+- [ ] T029a Implement rate limiting middleware — install `hono-rate-limiter` with in-memory store (dev) and Vercel KV store (production); apply to `/auth/login` (5/15min per IP+email), `/auth/magic-link` (3/15min per IP), `/auth/refresh` (30/min per user). Add account lockout after 10 consecutive password failures (`apps/api/src/middleware/rateLimitMiddleware.ts`)
 - [ ] T030 Write Vitest integration tests for all auth routes — magic link happy path, expired token 401, inactive user 403, wrong password 401, switch-tenant forbidden 403 (`apps/api/src/routes/auth.test.ts`)
 - [ ] T031 [P] Implement `apps/app/src/features/auth/` — login page with email field, magic link request, password fallback form, tenant picker modal, redirect logic (`apps/app/src/features/auth/LoginPage.tsx`, `TenantPicker.tsx`, `useAuth.ts`)
 - [ ] T032 [P] Implement `apps/portal/src/features/auth/` — same pattern as T031 for admin portal (`apps/portal/src/features/auth/LoginPage.tsx`, `useAuth.ts`)
@@ -88,6 +89,9 @@
 - [ ] T039 [P] Implement `apps/app/src/features/timesheets/` — TimesheetListPage, TimesheetDetailPage, NewTimesheetForm, EntryForm with client dropdown (TanStack Query hooks calling API) (`apps/app/src/features/timesheets/`)
 - [ ] T040 [P] Implement `apps/portal/src/features/timesheets/` — ApprovalQueuePage, TimesheetReviewPage with approve/reject actions (`apps/portal/src/features/timesheets/`)
 
+- [ ] T040a Implement `DELETE /api/org/:slug/timesheets/:id/entries/:entryId` — delete entry from draft timesheet; validate timesheet is in `draft` status and owned by the requesting employee (`apps/api/src/routes/timesheets.ts`)
+- [ ] T040b Implement `GET /api/org/:slug/pay-periods` — employee-accessible endpoint returning only `open` pay periods for the tenant; used in "New Timesheet" flow (`apps/api/src/routes/payPeriods.ts`)
+
 **Checkpoint:** US3 and US4 acceptance scenarios pass manually; RabbitMQ management UI shows message after approval.
 
 ---
@@ -103,6 +107,8 @@
 - [ ] T045 [P] Implement `apps/app/src/features/expenses/` — ExpenseListPage, NewExpenseForm, ReceiptUpload component (presign → direct S3 upload → update receipt_key on expense), submit action (`apps/app/src/features/expenses/`)
 - [ ] T046 [P] Implement `apps/portal/src/features/expenses/` — ExpenseReviewPage with approve/reject (`apps/portal/src/features/expenses/`)
 
+- [ ] T046a Implement `PATCH /api/org/:slug/expenses/:id` — update draft expense fields (merchant, category, amount, date, notes, receiptKey); reject if status is not `draft` (`apps/api/src/routes/expenses.ts`)
+
 **Checkpoint:** US5 acceptance scenarios pass manually; S3 bucket shows uploaded receipt with `{tenantId}/receipts/` prefix.
 
 ---
@@ -111,6 +117,7 @@
 
 > **Goal:** Admin connects QBO via OAuth 2.0; approved timesheets sync to QuickBooks.
 
+- [ ] T047a [P] Create `Dockerfile.worker` and Railway deployment config — Dockerfile for long-lived Node.js worker processes, `railway.toml` with health check endpoint, environment variable mirroring guide. Workers run as separate Railway services for independent scaling (`Dockerfile.worker`, `railway.toml`, `docs/worker-deployment.md`)
 - [ ] T047 Implement `apps/api/src/services/crypto.ts` — AES-256-GCM encrypt/decrypt functions using `QBO_TOKEN_ENCRYPTION_KEY` (`apps/api/src/services/crypto.ts`)
 - [ ] T048 Implement `apps/api/src/services/qbo.ts` — `intuit-oauth` client configuration, token exchange, token auto-refresh (5min before expiry), `syncTimesheet(timesheetId, tenantId)` function that creates QBO Time Activities (`apps/api/src/services/qbo.ts`)
 - [ ] T049 Implement QBO admin routes — `GET /admin/quickbooks` (status), `GET /admin/quickbooks/connect` (OAuth redirect with CSRF state), `GET /admin/quickbooks/callback` (exchange code, encrypt tokens, store), `DELETE /admin/quickbooks/disconnect` (revoke + delete + audit log), `POST /admin/quickbooks/sync` (manual enqueue) (`apps/api/src/routes/admin/quickbooks.ts`)
@@ -127,7 +134,7 @@
 
 > **Goal:** Employees receive Web Push notifications on timesheet approval/rejection.
 
-- [ ] T054 Implement `apps/api/src/services/push.ts` — generate VAPID keys, `sendPushNotification(userId, tenantId, payload)` using `web-push` library, auto-delete stale subscriptions (410 response) (`apps/api/src/services/push.ts`)
+- [ ] T054 Implement `apps/api/src/services/push.ts` — use VAPID keys from `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` env vars; `sendPushNotification(userId, tenantId, payload)` using `web-push` library; auto-delete stale subscriptions (410 response). Add VAPID env vars to `.env.example` with generation command: `npx web-push generate-vapid-keys` (`apps/api/src/services/push.ts`, `.env.example`)
 - [ ] T055 Implement `POST /api/org/:slug/push/subscribe` and `POST /api/org/:slug/push/unsubscribe` routes (`apps/api/src/routes/push.ts`)
 - [ ] T056 Implement `apps/api/src/workers/notificationsWorker.ts` — AMQP consumer on `timex.notifications` queue; sends push notification to all `push_subscriptions` for the target user (`apps/api/src/workers/notificationsWorker.ts`)
 - [ ] T057 Integrate push notification enqueue into timesheet approval and rejection in `timesheets.ts` route — after status update, publish to `timex.notifications` queue with employee's userId and event type (`apps/api/src/routes/timesheets.ts`)
@@ -155,7 +162,11 @@
 
 > **Goal:** Admin can manage employees, clients, assignments, and view dashboard stats.
 
-- [ ] T064 [P] Implement admin routes — `GET /api/org/:slug/admin/dashboard`, `GET/POST /api/org/:slug/admin/employees`, `GET/POST /api/org/:slug/admin/clients`, `GET/POST /api/org/:slug/admin/assignments`, `GET/POST /api/org/:slug/admin/pay-periods` (`apps/api/src/routes/admin/`)
+- [ ] T064a [P] Implement `GET /api/org/:slug/admin/dashboard` — pending timesheet count, open expense count, current pay period, QBO connection status (`apps/api/src/routes/admin/dashboard.ts`)
+- [ ] T064b [P] Implement `GET/POST /api/org/:slug/admin/employees` + `PATCH /api/org/:slug/admin/employees/:id` — list employees with roles, update employee status and role (`apps/api/src/routes/admin/employees.ts`)
+- [ ] T064c [P] Implement `GET/POST /api/org/:slug/admin/clients` + `PATCH /api/org/:slug/admin/clients/:id` — list clients, create client, update client details/status/QBO customer ID (`apps/api/src/routes/admin/clients.ts`)
+- [ ] T064d [P] Implement `GET/POST /api/org/:slug/admin/assignments` + `DELETE /api/org/:slug/admin/assignments/:id` — list assignments, create assignment, end assignment (set end_date) (`apps/api/src/routes/admin/assignments.ts`)
+- [ ] T064e [P] Implement `GET/POST /api/org/:slug/admin/pay-periods` + `PATCH /api/org/:slug/admin/pay-periods/:id/lock` — list pay periods, create pay period, lock pay period (`apps/api/src/routes/admin/payPeriods.ts`)
 - [ ] T065 [P] Write Vitest tests for admin routes — dashboard stats accuracy, manager/admin role gates, employee role returns 403 (`apps/api/src/routes/admin/admin.test.ts`)
 - [ ] T066 [P] Implement `apps/portal/src/features/dashboard/` — DashboardPage with pending timesheet count, open expense count, current pay period, QBO connection status (`apps/portal/src/features/dashboard/`)
 - [ ] T067 [P] Implement `apps/portal/src/features/employees/` — EmployeeListPage with role and status display (`apps/portal/src/features/employees/`)
@@ -172,6 +183,7 @@
 
 - [ ] T070 [P] Add `pino` logger to `apps/api/` — `src/lib/logger.ts` with child logger factory; attach `tenantId`, `userId`, `role` to logger context in `authMiddleware.ts`; log all API errors with route + tenant + error message (`apps/api/src/lib/logger.ts`)
 - [ ] T071 [P] Add New Relic browser agent to `apps/app/` and `apps/portal/` — initialize in `main.tsx` conditionally (skip when `PLAYWRIGHT=true`); attach user context after login (`apps/app/src/main.tsx`, `apps/portal/src/main.tsx`)
+- [ ] T071a Implement scheduled data cleanup job — Vercel cron or Railway cron to purge expired `magic_link_tokens` (>1 hour), expired `oauth_states` (>30 min). Batched deletes (LIMIT 1000) to avoid table locks. Log purge counts to Pino. Audit log retention: 6 years per HIPAA §164.530(j) — no auto-purge, archive to cold storage when table exceeds 10M rows (`apps/api/src/workers/cleanupWorker.ts`, `.github/workflows/cleanup-cron.yml`)
 - [ ] T072 Verify audit log writes — integration test confirming that timesheet approval, rejection, QBO connect, QBO disconnect all produce rows in `audit_logs` with correct `action`, `entity_type`, and `entity_id` (`apps/api/src/audit.test.ts`)
 
 **Checkpoint:** Dev server logs show structured JSON with tenantId on API errors; `audit_logs` table populated after test scenarios.

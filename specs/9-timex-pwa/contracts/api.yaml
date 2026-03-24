@@ -20,7 +20,26 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  parameters:
+    PaginationLimit:
+      name: limit
+      in: query
+      description: Maximum number of items to return
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    PaginationOffset:
+      name: offset
+      in: query
+      description: Number of items to skip
+      schema: { type: integer, minimum: 0, default: 0 }
+
   schemas:
+    PaginatedMeta:
+      type: object
+      properties:
+        total: { type: integer, description: Total number of matching items }
+        limit: { type: integer }
+        offset: { type: integer }
+
     Error:
       type: object
       required: [error]
@@ -270,6 +289,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Rate limit exceeded — 5 attempts per email per 15 minutes. Account locked after 10 consecutive failures for 30 minutes.
 
   /auth/refresh:
     post:
@@ -341,6 +362,8 @@ paths:
         - name: payPeriodId
           in: query
           schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
       responses:
         '200':
           description: List of timesheets
@@ -352,6 +375,7 @@ paths:
                   timesheets:
                     type: array
                     items: { $ref: '#/components/schemas/Timesheet' }
+                  meta: { $ref: '#/components/schemas/PaginatedMeta' }
         '401': { description: Unauthorized }
         '403': { description: Forbidden — wrong tenant }
 
@@ -443,6 +467,32 @@ paths:
               schema: { $ref: '#/components/schemas/TimesheetEntry' }
         '422': { description: Not assigned to this client / hours must be > 0 }
 
+  /org/{slug}/timesheets/{id}/entries/{entryId}:
+    delete:
+      summary: Delete a timesheet entry
+      description: Remove an entry from a draft timesheet. Only allowed when timesheet status is `draft`.
+      tags: [Timesheets]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Entry deleted }
+        '403': { description: Not the timesheet owner }
+        '404': { description: Entry not found }
+        '422': { description: Timesheet is not in draft status }
+
   /org/{slug}/timesheets/{id}/status:
     patch:
       summary: Update timesheet status
@@ -498,6 +548,8 @@ paths:
         - name: status
           in: query
           schema: { type: string, enum: [draft, submitted, approved, rejected] }
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
       responses:
         '200':
           description: List of expenses
@@ -509,6 +561,7 @@ paths:
                   expenses:
                     type: array
                     items: { $ref: '#/components/schemas/Expense' }
+                  meta: { $ref: '#/components/schemas/PaginatedMeta' }
 
     post:
       summary: Create an expense
@@ -540,6 +593,44 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Expense' }
+
+  /org/{slug}/expenses/{id}:
+    patch:
+      summary: Update a draft expense
+      description: Edit expense fields while in `draft` status. Cannot modify submitted/approved/rejected expenses.
+      tags: [Expenses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                merchant: { type: string }
+                category: { type: string }
+                amount: { type: number, minimum: 0.01 }
+                expenseDate: { type: string, format: date }
+                notes: { type: string, nullable: true }
+                receiptKey: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Expense updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expense' }
+        '403': { description: Not the expense owner }
+        '422': { description: Expense is not in draft status }
 
   /org/{slug}/expenses/{id}/status:
     patch:
@@ -604,6 +695,32 @@ paths:
                   clients:
                     type: array
                     items: { $ref: '#/components/schemas/Client' }
+
+  # ─── PAY PERIODS (EMPLOYEE-ACCESSIBLE) ───────────────────────────────────────
+
+  /org/{slug}/pay-periods:
+    get:
+      summary: List open pay periods
+      description: Returns pay periods with status `open` for the tenant. Used by employees to select a pay period when creating a timesheet.
+      tags: [Pay Periods]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of open pay periods
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payPeriods:
+                    type: array
+                    items: { $ref: '#/components/schemas/PayPeriod' }
 
   # ─── FILE UPLOAD ─────────────────────────────────────────────────────────────
 
@@ -906,6 +1023,101 @@ paths:
               schema: { $ref: '#/components/schemas/Client' }
         '403': { description: Admin role required }
 
+  /org/{slug}/admin/clients/{id}:
+    patch:
+      summary: Update a client
+      description: Update client details (name, code, QBO customer ID, status).
+      tags: [Admin - Clients]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                code: { type: string, nullable: true }
+                status: { type: string, enum: [active, inactive, discharged] }
+                qboCustomerId: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Client updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Client' }
+        '403': { description: Admin role required }
+        '404': { description: Client not found }
+
+  /org/{slug}/admin/employees/{id}:
+    patch:
+      summary: Update an employee profile
+      description: Update employee status (active/inactive) and role.
+      tags: [Admin - Employees]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [active, inactive] }
+                role: { type: string, enum: [employee, manager, admin] }
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '403': { description: Admin role required }
+        '404': { description: Employee not found }
+
+  /org/{slug}/admin/pay-periods/{id}/lock:
+    patch:
+      summary: Lock a pay period
+      description: Transition a pay period from `open` to `locked`. Prevents new timesheet creation for this period.
+      tags: [Admin - Pay Periods]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Pay period locked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PayPeriod' }
+        '403': { description: Admin role required }
+        '422': { description: Pay period is already locked }
+
   /org/{slug}/admin/assignments:
     get:
       summary: List assignments
@@ -960,6 +1172,31 @@ paths:
               schema: { $ref: '#/components/schemas/Assignment' }
         '409': { description: Assignment already exists }
         '403': { description: Admin role required }
+
+  /org/{slug}/admin/assignments/{id}:
+    delete:
+      summary: End an assignment
+      description: Sets `end_date` to today, effectively ending the employee-client assignment.
+      tags: [Admin - Assignments]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Assignment ended
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Assignment' }
+        '403': { description: Admin role required }
+        '404': { description: Assignment not found }
 
   /org/{slug}/admin/pay-periods:
     get:

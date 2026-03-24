@@ -64,7 +64,7 @@ This checklist acts as "unit tests for English" on the complete artifact set. Ev
   - PWA: Vite PWA Plugin (injectManifest) ✓
   - Logging: Pino ✓
   - E2E Testing: Playwright ✓
-- [x] `data-model.md` covers all 13 entities mentioned in the spec (tenants, profiles, user_tenant_roles, pay_periods, clients, assignments, timesheets, timesheet_entries, expenses, push_subscriptions, qbo_credentials, audit_logs, oauth_states) plus `magic_link_tokens` added in T023
+- [x] `data-model.md` covers all 14 entities mentioned in the spec (tenants, profiles, user_tenant_roles, pay_periods, clients, assignments, timesheets, timesheet_entries, expenses, push_subscriptions, qbo_credentials, audit_logs, oauth_states, magic_link_tokens) — `magic_link_tokens` fully defined with columns, indexes, and cleanup strategy
 - [x] `contracts/api.yaml` covers all API surfaces mentioned in the plan:
   - Branding + manifest (T020) ✓
   - Auth routes (T023–T029) ✓
@@ -127,6 +127,13 @@ This checklist acts as "unit tests for English" on the complete artifact set. Ev
   - US8 (PWA installable) → Phase 9 (T059–T063)
   - US9 (push notifications) → Phase 8 (T054–T058)
   - US10 (admin portal) → Phase 10 (T064–T069)
+- [x] All deferred architectural decisions have resolution tasks — worker deployment resolved in plan.md with Railway; task T047a creates deployment config
+- [x] New CRUD operations have corresponding tasks — T040a (delete entry), T040b (pay periods), T046a (edit expense), T064b-e (admin CRUD)
+- [x] HIPAA 2026 MFA requirement addressed — FR-019 added, constitution updated with §164.312 safeguard mapping
+- [x] Rate limiting on all auth endpoints — T029a implements `hono-rate-limiter` middleware; FR-020/FR-021 specify limits
+- [x] Data cleanup strategy defined — T071a for expired tokens/states; FR-022/FR-023 specify retention
+- [x] Seed data supports isolation testing — T013 updated to seed second tenant (Test Corp)
+- [x] VAPID keys documented in env template — T054 updated to add to `.env.example`
 - [x] Phase ordering respects dependencies:
   - Phase 2 (DB) comes before Phase 3 (API) — schema must exist before middleware
   - Phase 3 (API Core) comes before Phase 4 (Auth) — middleware chain needed

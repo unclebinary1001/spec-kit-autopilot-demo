@@ -157,10 +157,39 @@ Timesheet status transitions are enforced in the PATCH handler via an allowed-tr
 `intuit-oauth` library handles the OAuth 2.0 flow. Per-tenant `access_token_enc` and `refresh_token_enc` are stored in `qbo_credentials`. Auto-refresh occurs 5 minutes before `expires_at`. Re-encryption happens on every token refresh.
 
 ### RabbitMQ Worker Architecture
-Workers (`qboSyncWorker.ts`, `notificationsWorker.ts`) run as long-lived Node.js processes separate from the Vercel serverless API. They are deployed as Vercel cron-triggered functions or as standalone processes on a container service (to be decided during Phase 8). Each has a dedicated DLQ.
+Workers (`qboSyncWorker.ts`, `notificationsWorker.ts`) run as long-lived Node.js processes separate from the Vercel serverless API. They require persistent AMQP TCP connections and cannot run as Vercel serverless functions (10s/60s timeout limits are insufficient; AMQP connections must stay open).
+
+**Deployment decision: Railway (or Fly.io as fallback)**
+- Workers are deployed as containerized Node.js processes on Railway using a shared `Dockerfile.worker`
+- Each worker runs as a separate Railway service for independent scaling and crash isolation
+- Environment variables are mirrored from Vercel env to Railway project settings
+- Health checks via HTTP endpoint on each worker (`/healthz`)
+- Railway's $5/mo Starter plan provides sufficient compute for MVP; auto-sleep disabled for workers
+
+**Rationale:** Railway provides persistent process hosting with zero-config Docker deployments, built-in log streaming, and automatic restarts — the simplest path for long-lived AMQP consumers. Fly.io is a viable alternative if multi-region is needed later.
+
+Each worker has a dedicated DLQ (`timex.qbo-sync.dlq`, `timex.notifications.dlq`).
 
 ### Dynamic PWA Manifest
 `/api/org/:slug/manifest.json` (public, no auth) returns a JSON manifest with tenant branding. The Vite PWA plugin is configured with `injectManifest` strategy; the service worker imports the manifest URL at runtime.
+
+---
+
+## Scaling & Limits
+
+| Service | Plan | Limit | Implication |
+|---|---|---|---|
+| Neon PostgreSQL | Pro | 100 concurrent connections | Drizzle connection pool `max: 20` per serverless instance; monitor with `pg_stat_activity` |
+| Vercel Serverless | Pro | 60s timeout (14min with Fluid Compute), 1000 concurrent executions | API routes must complete within 60s; long-running work offloaded to workers |
+| CloudAMQP RabbitMQ | Lemur ($19/mo) | 20 connections, 1M messages/mo | Workers hold 1 connection each; API publisher uses a shared connection. 1M messages is ~33K timesheets/month — sufficient for MVP |
+| AWS S3 | Standard | 5,500 PUT/s, 3,500 GET/s per prefix | Tenant-prefixed keys distribute load; no concern at MVP scale |
+| Resend | Free/Pro | 100 emails/day (free), 50K/mo (Pro) | Magic link volume: ~50 logins/day for MVP; Pro plan for production |
+| Railway (workers) | Starter ($5/mo) | 8GB RAM, 8 vCPU shared | Sufficient for 2 Node.js workers |
+
+**Scaling triggers:**
+- If p95 latency exceeds 500ms → add Neon read replicas and/or increase connection pool
+- If queue depth exceeds 1000 messages → add worker replicas on Railway
+- If concurrent Vercel executions exceed 80% → evaluate Vercel Enterprise or move API to Railway
 
 ---
 
@@ -175,3 +204,5 @@ No constitution violations. The following areas warrant extra attention during i
 | Neon preview branches in CI | Neon CLI integration with GitHub Actions; branch name derived from PR number |
 | Multi-tenant JWT re-issuance | Tenant picker must not create a session before the user selects a tenant |
 | Dynamic service worker manifest | Workbox `injectManifest` requires careful precache manifest exclusion to avoid caching tenant-specific assets globally |
+| MFA implementation | Device-bound second factor must not degrade mobile UX; consider trusted-device cookie (30-day) to reduce MFA friction after first verification |
+| Data cleanup jobs | Expired tokens/states must be purged without locking production tables; use `DELETE ... WHERE expires_at < now() - interval '1 hour' LIMIT 1000` in batches |

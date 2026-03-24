@@ -117,9 +117,11 @@ tenants
 | `status` | `text` | NOT NULL, default `'active'`, CHECK in (`active`, `inactive`) | |
 | `password_hash` | `text` | nullable | null for magic-link-only users |
 | `created_at` | `timestamptz` | NOT NULL, default `now()` | |
+| `updated_at` | `timestamptz` | NOT NULL, default `now()` | |
 
 **RLS:** enabled
 **Indexes:** `idx_profiles_tenant ON profiles(tenant_id)`, `idx_profiles_email ON profiles(email)`
+**PII note:** `email` and `full_name` are personally identifiable information (PII). Protected by Neon encryption-at-rest and RLS tenant isolation.
 
 ---
 
@@ -270,11 +272,13 @@ qbo_approved → qbo_synced (RabbitMQ consumer)
 | `id` | `uuid` | PK, default `gen_random_uuid()` | |
 | `tenant_id` | `uuid` | NOT NULL, FK → `tenants(id)` | |
 | `user_id` | `uuid` | NOT NULL, FK → `profiles(id)` ON DELETE CASCADE | |
-| `token` | `text` | NOT NULL | Web Push subscription JSON |
+| `endpoint` | `text` | NOT NULL | Web Push subscription endpoint URL |
+| `p256dh_key` | `text` | NOT NULL | Web Push P-256 Diffie-Hellman public key |
+| `auth_key` | `text` | NOT NULL | Web Push authentication secret |
 | `platform` | `text` | NOT NULL, CHECK in (`web-mobile`, `web-portal`, `ios`, `android`) | |
 | `created_at` | `timestamptz` | NOT NULL, default `now()` | |
 | `updated_at` | `timestamptz` | NOT NULL, default `now()` | |
-| | | UNIQUE(`user_id`, `token`) | One subscription per device per user |
+| | | UNIQUE(`user_id`, `endpoint`) | One subscription per endpoint per user |
 
 **RLS:** enabled
 **Indexes:** `idx_push_subs_tenant ON push_subscriptions(tenant_id)`
@@ -346,9 +350,26 @@ qbo_approved → qbo_synced (RabbitMQ consumer)
 
 ---
 
+### `magic_link_tokens`
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | `uuid` | PK, default `gen_random_uuid()` | |
+| `tenant_id` | `uuid` | NOT NULL, FK → `tenants(id)` ON DELETE CASCADE | |
+| `email` | `text` | NOT NULL | |
+| `token` | `text` | NOT NULL, UNIQUE | Cryptographically random, 32 bytes hex |
+| `expires_at` | `timestamptz` | NOT NULL | 15 minutes from creation (FR-003) |
+| `used_at` | `timestamptz` | nullable | Set on first use; prevents replay |
+| `created_at` | `timestamptz` | NOT NULL, default `now()` | |
+
+**Indexes:** `idx_mlt_token ON magic_link_tokens(token)`, `idx_mlt_email ON magic_link_tokens(email)`
+**Cleanup:** Scheduled job purges tokens where `expires_at < now() - interval '1 hour'` (FR-022). Runs every hour via cron.
+
+---
+
 ## Migration Considerations
 
 1. **Extension:** `CREATE EXTENSION IF NOT EXISTS btree_gist;` — required before the `pay_periods` exclusion constraint.
 2. **RLS setup:** Drizzle does not generate RLS policy SQL. Raw SQL migration files needed for each `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` and `CREATE POLICY` statements.
-3. **Migration order:** `tenants` → `profiles` → `user_tenant_roles` → `pay_periods` → `clients` → `assignments` → `timesheets` → `timesheet_entries` → `expenses` → `push_subscriptions` → `qbo_credentials` → `oauth_states` → `audit_logs`
+3. **Migration order:** `tenants` → `profiles` → `user_tenant_roles` → `pay_periods` → `clients` → `assignments` → `timesheets` → `timesheet_entries` → `expenses` → `push_subscriptions` → `qbo_credentials` → `oauth_states` → `magic_link_tokens` → `audit_logs`
 4. **Neon branching:** `drizzle-kit push` is run against a Neon branch URL in CI (not `drizzle-kit migrate` with SQL files) for speed. Production uses generated SQL migration files applied via `drizzle-kit migrate`.
