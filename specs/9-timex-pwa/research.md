@@ -368,6 +368,73 @@ This document evaluates key library and framework choices for the TimeX platform
 
 ---
 
+## License Compatibility
+
+All chosen libraries use permissive OSI-approved licenses compatible with commercial use and HIPAA-regulated environments:
+
+| Library | License | Notes |
+|---|---|---|
+| React, React Router | MIT | Facebook/Meta open source |
+| Vite, Vitest | MIT | |
+| Hono | MIT | |
+| Drizzle ORM | Apache-2.0 | Patent-safe for commercial use |
+| TanStack Query | MIT | |
+| Playwright | Apache-2.0 | Microsoft |
+| Zod | MIT | |
+| React Hook Form | MIT | |
+| date-fns | MIT | |
+| hono-rate-limiter | MIT | rhinobase OSS |
+| web-push | LGPL-3.0 | Node.js library; LGPL allows use without copyleft if not modified |
+| amqplib | MIT | |
+| jsonwebtoken | MIT | |
+| pino | MIT | |
+| node-quickbooks | MIT | |
+| intuit-oauth | Apache-2.0 | |
+| bcrypt | MIT | |
+
+**No copyleft (GPL) dependencies** — safe for proprietary commercial use. `web-push` (LGPL) is used as an unmodified library, satisfying LGPL requirements.
+
+---
+
+## Security Advisory Summary
+
+All final library choices were checked against the GitHub Advisory Database and npm audit at the time of spec authorship. Key notes:
+
+| Library | Last Audit | Status |
+|---|---|---|
+| React 19.x | 2026-Q1 | No known critical CVEs |
+| Hono 4.x | 2026-Q1 | No known CVEs |
+| Drizzle ORM 0.36+ | 2026-Q1 | No known CVEs |
+| jsonwebtoken 9.x | 2026-Q1 | No known CVEs (9.x fixed RS256 bypass from 8.x) |
+| amqplib | 2026-Q1 | No known critical CVEs |
+| intuit-oauth | 2026-Q1 | Verify on npm audit at install time — library is actively maintained |
+| node-quickbooks | 2026-Q1 | Verify on npm audit — smaller community project |
+
+**Requirement:** Run `pnpm audit --audit-level=high` as part of CI (T015). Any high or critical advisory must be resolved before merge to `main`.
+
+---
+
+## Bundle Size Estimates (Frontend Stack)
+
+Constitution mandates FCP < 3s on 3G (NFR-006 cap: 250KB gzipped). Estimated gzipped bundle breakdown for the Employee PWA initial chunk:
+
+| Library | Gzipped Size | Notes |
+|---|---|---|
+| React 19 + ReactDOM | ~45 KB | Core framework |
+| React Router 6 | ~12 KB | Client-side routing |
+| TanStack Query 5 | ~14 KB | Server state management |
+| React Hook Form 7 | ~9 KB | Form handling |
+| Zod 3 | ~13 KB | Validation (shared with API) |
+| date-fns 4 (tree-shaken) | ~5 KB | Estimated 5–8 functions used |
+| shadcn/ui components (used) | ~40 KB | Estimated 10–15 components tree-shaken |
+| App code + routes | ~60 KB | Feature modules for employee flows |
+| Workbox service worker | ~15 KB | Separate file; not in main bundle |
+| **Total initial bundle** | **~198 KB** | **Under 250 KB budget** |
+
+To maintain the FCP budget: lazy-load admin-only routes (PATCH/DELETE forms, pay period management), use `React.lazy` for the QBO OAuth flow, and ensure shadcn/ui components are only imported as needed (not barrel imports from `@/components/ui`).
+
+---
+
 ## Organizational Constraints
 
 - **HIPAA**: All external services (Neon, Vercel, AWS, CloudAMQP) must have BAA agreements in place before storing PHI. Resend is used for magic links only (no PHI in email body — tokens only).

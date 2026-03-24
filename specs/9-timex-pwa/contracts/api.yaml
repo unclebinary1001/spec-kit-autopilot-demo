@@ -7,6 +7,12 @@ info:
     All tenant-scoped routes require a valid JWT access token.
     Base path: /api
 
+    **Versioning strategy:** This API uses URL-path versioning. The current version is
+    implicitly v1 (no prefix). When breaking changes are introduced, a `/v2/` prefix
+    will be added to the base path and both versions will be served concurrently for
+    a deprecation period. Non-breaking additions (new optional fields, new endpoints)
+    are made to the current version without a new prefix.
+
 servers:
   - url: http://localhost:3000/api
     description: Local development
@@ -31,6 +37,14 @@ components:
       in: query
       description: Number of items to skip
       schema: { type: integer, minimum: 0, default: 0 }
+
+  responses:
+    InternalServerError:
+      description: Unexpected server error. All error responses follow the Error schema.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "Internal server error" }
 
   schemas:
     PaginatedMeta:
@@ -160,6 +174,7 @@ components:
         startDate: { type: string, format: date }
         endDate: { type: string, format: date, nullable: true }
 
+
 paths:
 
   # ─── PUBLIC / NO AUTH ───────────────────────────────────────────────────────
@@ -185,6 +200,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/manifest.json:
     get:
@@ -213,6 +229,7 @@ paths:
                   icons: { type: array }
         '404':
           description: Tenant not found
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   # ─── AUTH ────────────────────────────────────────────────────────────────────
 
@@ -242,6 +259,7 @@ paths:
                   message: { type: string, example: "If your email is registered, a link has been sent." }
         '429':
           description: Rate limit exceeded
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /auth/verify:
     get:
@@ -261,6 +279,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /auth/login:
     post:
@@ -291,6 +310,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '429':
           description: Rate limit exceeded — 5 attempts per email per 15 minutes. Account locked after 10 consecutive failures for 30 minutes.
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /auth/refresh:
     post:
@@ -305,6 +325,7 @@ paths:
               schema: { $ref: '#/components/schemas/AuthTokens' }
         '401':
           description: Refresh token invalid or expired
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /auth/logout:
     post:
@@ -316,6 +337,7 @@ paths:
       responses:
         '200':
           description: Logged out successfully
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /auth/switch-tenant:
     post:
@@ -341,6 +363,7 @@ paths:
               schema: { $ref: '#/components/schemas/AuthTokens' }
         '403':
           description: User does not belong to the requested tenant
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   # ─── TIMESHEETS ──────────────────────────────────────────────────────────────
 
@@ -378,6 +401,7 @@ paths:
                   meta: { $ref: '#/components/schemas/PaginatedMeta' }
         '401': { description: Unauthorized }
         '403': { description: Forbidden — wrong tenant }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
     post:
       summary: Create a timesheet
@@ -407,6 +431,7 @@ paths:
               schema: { $ref: '#/components/schemas/Timesheet' }
         '409': { description: Timesheet already exists for this pay period }
         '422': { description: Pay period is locked }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/timesheets/{id}:
     get:
@@ -430,6 +455,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Timesheet' }
         '404': { description: Not found }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/timesheets/{id}/entries:
     post:
@@ -466,6 +492,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TimesheetEntry' }
         '422': { description: Not assigned to this client / hours must be > 0 }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/timesheets/{id}/entries/{entryId}:
     delete:
@@ -492,6 +519,7 @@ paths:
         '403': { description: Not the timesheet owner }
         '404': { description: Entry not found }
         '422': { description: Timesheet is not in draft status }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/timesheets/{id}/status:
     patch:
@@ -531,6 +559,7 @@ paths:
               schema: { $ref: '#/components/schemas/Timesheet' }
         '403': { description: Role not allowed for this transition }
         '422': { description: Invalid status transition }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   # ─── EXPENSES ────────────────────────────────────────────────────────────────
 
@@ -562,6 +591,7 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/Expense' }
                   meta: { $ref: '#/components/schemas/PaginatedMeta' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
     post:
       summary: Create an expense
@@ -593,6 +623,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Expense' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/expenses/{id}:
     patch:
@@ -631,6 +662,7 @@ paths:
               schema: { $ref: '#/components/schemas/Expense' }
         '403': { description: Not the expense owner }
         '422': { description: Expense is not in draft status }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/expenses/{id}/status:
     patch:
@@ -666,6 +698,7 @@ paths:
               schema: { $ref: '#/components/schemas/Expense' }
         '403': { description: Role not permitted }
         '422': { description: Invalid transition }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   # ─── CLIENTS ─────────────────────────────────────────────────────────────────
 
@@ -695,6 +728,7 @@ paths:
                   clients:
                     type: array
                     items: { $ref: '#/components/schemas/Client' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   # ─── PAY PERIODS (EMPLOYEE-ACCESSIBLE) ───────────────────────────────────────
 
@@ -721,6 +755,7 @@ paths:
                   payPeriods:
                     type: array
                     items: { $ref: '#/components/schemas/PayPeriod' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   # ─── FILE UPLOAD ─────────────────────────────────────────────────────────────
 
@@ -761,6 +796,7 @@ paths:
                   uploadUrl: { type: string, format: uri }
                   key: { type: string, description: S3 object key to store on the record }
         '413': { description: File size exceeds 10 MB limit }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/upload/download-url:
     post:
@@ -793,6 +829,7 @@ paths:
                 properties:
                   downloadUrl: { type: string, format: uri }
         '403': { description: Key does not belong to this tenant }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   # ─── PUSH NOTIFICATIONS ──────────────────────────────────────────────────────
 
@@ -824,6 +861,7 @@ paths:
       responses:
         '201': { description: Subscription registered }
         '200': { description: Subscription already exists (idempotent) }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/push/unsubscribe:
     post:
@@ -847,6 +885,7 @@ paths:
                 token: { type: string }
       responses:
         '200': { description: Subscription removed }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   # ─── ADMIN ROUTES ─────────────────────────────────────────────────────────────
 
@@ -869,6 +908,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/QboStatus' }
         '403': { description: Admin role required }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/quickbooks/connect:
     get:
@@ -885,6 +925,7 @@ paths:
       responses:
         '302': { description: Redirect to Intuit OAuth authorization page }
         '403': { description: Admin role required }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/quickbooks/callback:
     get:
@@ -911,6 +952,7 @@ paths:
       responses:
         '302': { description: Redirect to Admin Portal QBO settings page }
         '400': { description: Invalid state or missing parameters }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/quickbooks/disconnect:
     delete:
@@ -928,6 +970,7 @@ paths:
         '200': { description: Disconnected successfully }
         '403': { description: Admin role required }
         '404': { description: No QBO connection found }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/quickbooks/sync:
     post:
@@ -945,6 +988,7 @@ paths:
         '202': { description: Sync jobs enqueued }
         '403': { description: Admin role required }
         '503': { description: QBO not connected }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/employees:
     get:
@@ -969,6 +1013,7 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/Profile' }
         '403': { description: Manager or Admin role required }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/clients:
     get:
@@ -993,6 +1038,7 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/Client' }
         '403': { description: Manager or Admin role required }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
     post:
       summary: Create a client
@@ -1022,6 +1068,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Client' }
         '403': { description: Admin role required }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/clients/{id}:
     patch:
@@ -1058,6 +1105,7 @@ paths:
               schema: { $ref: '#/components/schemas/Client' }
         '403': { description: Admin role required }
         '404': { description: Client not found }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/employees/{id}:
     patch:
@@ -1092,6 +1140,7 @@ paths:
               schema: { $ref: '#/components/schemas/Profile' }
         '403': { description: Admin role required }
         '404': { description: Employee not found }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/pay-periods/{id}/lock:
     patch:
@@ -1117,6 +1166,7 @@ paths:
               schema: { $ref: '#/components/schemas/PayPeriod' }
         '403': { description: Admin role required }
         '422': { description: Pay period is already locked }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/assignments:
     get:
@@ -1141,6 +1191,7 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/Assignment' }
         '403': { description: Admin role required }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
     post:
       summary: Create an assignment
@@ -1172,6 +1223,7 @@ paths:
               schema: { $ref: '#/components/schemas/Assignment' }
         '409': { description: Assignment already exists }
         '403': { description: Admin role required }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/assignments/{id}:
     delete:
@@ -1197,6 +1249,7 @@ paths:
               schema: { $ref: '#/components/schemas/Assignment' }
         '403': { description: Admin role required }
         '404': { description: Assignment not found }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/pay-periods:
     get:
@@ -1220,6 +1273,7 @@ paths:
                   payPeriods:
                     type: array
                     items: { $ref: '#/components/schemas/PayPeriod' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
     post:
       summary: Create a pay period
@@ -1248,6 +1302,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PayPeriod' }
         '409': { description: Overlapping pay period exists }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 
   /org/{slug}/admin/dashboard:
     get:
@@ -1273,3 +1328,4 @@ paths:
                   currentPayPeriod: { $ref: '#/components/schemas/PayPeriod' }
                   qboConnected: { type: boolean }
         '403': { description: Manager or Admin role required }
+        '500': { $ref: '#/components/responses/InternalServerError' }

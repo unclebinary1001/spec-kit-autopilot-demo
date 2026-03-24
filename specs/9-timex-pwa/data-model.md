@@ -53,7 +53,7 @@ tenants
   │      └──< push_subscriptions
   │             user_id (FK → profiles)
   │             tenant_id (FK → tenants)
-  │             token (UNIQUE per user), platform
+  │             endpoint (UNIQUE per user), p256dh_key, auth_key, platform
   │
   ├──< pay_periods
   │      tenant_id (FK → tenants)
@@ -73,6 +73,10 @@ tenants
   │      tenant_id (FK → tenants)
   │      user_id (FK → profiles)
   │      state (UNIQUE), expires_at
+  │
+  ├──< magic_link_tokens (one-time auth tokens)
+  │      tenant_id (FK → tenants)
+  │      email, token (UNIQUE), expires_at, used_at (nullable)
   │
   └──< audit_logs (append-only, no RLS)
          tenant_id (FK → tenants)

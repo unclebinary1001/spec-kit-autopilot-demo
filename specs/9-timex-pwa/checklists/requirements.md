@@ -37,7 +37,7 @@ This checklist acts as "unit tests for English" on the complete artifact set. Ev
 
 ## Plan Completeness
 
-- [x] Every functional requirement (FR-001 through FR-018) is addressed in `plan.md`
+- [x] Every functional requirement (FR-001 through FR-024) is addressed in `plan.md`
   - FR-001 (tenant isolation): addressed in "Tenant Isolation Layers" section
   - FR-002 (PWA installable): addressed in "Dynamic PWA Manifest" and Constitution IV
   - FR-003 (magic link 15-min expiry): addressed in Phase 4 tasks (T023–T025)
@@ -56,14 +56,24 @@ This checklist acts as "unit tests for English" on the complete artifact set. Ev
   - FR-016 (CLAUDE.md + AGENTS.md): addressed in Phase 14 tasks
   - FR-017 (Neon preview branches): addressed in Phase 12 tasks (T073–T075)
   - FR-018 (Vercel preview URLs): addressed in T073–T074 CI workflows
+  - FR-019 (MFA for HIPAA §164.312(d)): addressed in constitution §164.312 mapping; T029a implements hono-rate-limiter + device-bound cookie
+  - FR-020 (password login rate limiting): addressed in T029a; `api.yaml` 429 on /auth/login
+  - FR-021 (all auth endpoints 429 on limit): addressed in T029a and `api.yaml`
+  - FR-022 (expired token cleanup): addressed in T071a scheduled job
+  - FR-023 (6-year audit log retention): addressed in T071a + data-model.md audit_logs notes
+  - FR-024 (WCAG 2.1 AA): addressed in NFR-001 and SC-008 Playwright suite
 - [x] All constitution principles listed with explicit compliance notes in `plan.md § Constitution Check`
-- [x] `research.md` provides a clear final recommendation for each of 6 decisions:
+- [x] `research.md` provides a clear final recommendation for each of 10 decisions:
   - ORM: Drizzle ORM ✓
   - Auth: Custom JWT ✓
   - Messaging: RabbitMQ via CloudAMQP ✓
   - PWA: Vite PWA Plugin (injectManifest) ✓
   - Logging: Pino ✓
   - E2E Testing: Playwright ✓
+  - Form handling: React Hook Form ✓
+  - Validation: Zod ✓
+  - Date/time: date-fns ✓
+  - Rate limiting: hono-rate-limiter ✓
 - [x] `data-model.md` covers all 14 entities mentioned in the spec (tenants, profiles, user_tenant_roles, pay_periods, clients, assignments, timesheets, timesheet_entries, expenses, push_subscriptions, qbo_credentials, audit_logs, oauth_states, magic_link_tokens) — `magic_link_tokens` fully defined with columns, indexes, and cleanup strategy
 - [x] `contracts/api.yaml` covers all API surfaces mentioned in the plan:
   - Branding + manifest (T020) ✓
@@ -153,7 +163,7 @@ This checklist acts as "unit tests for English" on the complete artifact set. Ev
   - plan.md: references US1–US10 via phase descriptions
   - tasks.md: `[US1]`–`[US10]` tags on relevant tasks
   - contracts/api.yaml: tags align with user story groupings
-- [x] Requirement IDs (FR-001 through FR-018) are consistent across spec.md and plan.md (plan §Constitution Check + Complexity Tracking reference FR numbers)
+- [x] Requirement IDs (FR-001 through FR-024) are consistent across spec.md and plan.md (plan §Constitution Check + Complexity Tracking reference FR numbers)
 - [x] Technology choices in plan.md match recommendations in research.md:
   - ORM: Drizzle ORM (plan: "Drizzle ORM + Neon serverless driver") ✓
   - Auth: Custom JWT + Resend (plan: "jsonwebtoken, magic link via Resend, bcrypt") ✓
@@ -162,7 +172,7 @@ This checklist acts as "unit tests for English" on the complete artifact set. Ev
   - Logging: Pino (plan: "structured JSON logging (`pino`)") ✓
   - Testing: Playwright (plan: "Playwright (E2E)") ✓
 - [x] `data-model.md` entity names match Drizzle schema in task T011 (snake_case table names consistent throughout)
-- [x] Edge cases from spec.md EC-001–EC-012 are addressed in API contracts and tasks:
+- [x] Edge cases from spec.md EC-001–EC-015 are addressed in API contracts and tasks:
   - EC-001 (locked pay period) → T033 enforces; `api.yaml` 422 on POST /timesheets
   - EC-002 (hours = 0) → T035; DB CHECK constraint in T011; `api.yaml` minimum: 0.01
   - EC-003 (expired magic link) → T025 handles; `api.yaml` 401 on /auth/verify
@@ -175,3 +185,6 @@ This checklist acts as "unit tests for English" on the complete artifact set. Ev
   - EC-010 (10 MB limit) → T041 S3 service + `api.yaml` 413; T045 frontend validation
   - EC-011 (migration failure in CI) → T073 step ordering; deploy blocked until migrate succeeds
   - EC-012 (QBO disconnect mid-sync) → T052 checks credentials existence before each sync
+  - EC-013 (brute force — 10+ failed attempts) → T029a rate limiter; FR-020; `api.yaml` 429 on /auth/login
+  - EC-014 (expired magic link tokens accumulate) → T071a cleanup job; FR-022 specifies 1-hour purge window
+  - EC-015 (employee accesses pay period list) → T040b non-admin endpoint; `api.yaml` GET /org/:slug/pay-periods
