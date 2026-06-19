@@ -354,7 +354,7 @@ jobs:
       - name: Install spec-kit CLI
         run: uv tool install specify-cli --from "git+https://github.com/github/spec-kit.git"
       - name: Bootstrap spec-kit templates
-        run: specify init . --ai copilot --here --force --no-git
+        run: specify init . --integration copilot --here --force --no-git
 
       - name: Configure Git credentials
         env:
@@ -1190,4 +1190,3 @@ jobs:
           name: safe-output-items
           path: /tmp/gh-aw/safe-output-items.jsonl
           if-no-files-found: ignore
-
