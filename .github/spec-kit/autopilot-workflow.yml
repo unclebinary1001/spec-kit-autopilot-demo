@@ -1,0 +1,66 @@
+schema_version: "1.0"
+workflow:
+  id: "speckit-autopilot"
+  name: "Spec Kit Autopilot"
+  version: "1.0.0"
+  author: "intellibyte-software"
+  description: "Runs the real spec-kit commands: constitution -> specify -> clarify -> plan -> tasks -> implement"
+
+# Fail fast on an incompatible CLI. 0.8.5 is the first release with engine-side
+# resolution of integration defaults (same floor the built-in `speckit`
+# workflow declares). The integration list is an advisory compatibility hint.
+requires:
+  speckit_version: ">=0.8.5"
+  integrations:
+    any:
+      - "copilot"
+      - "claude"
+      - "gemini"
+
+# A single free-form description of the feature to build. The triggering issue's
+# title + body is passed in here by the GitHub Actions workflow.
+inputs:
+  request:
+    type: string
+    required: true
+
+# No `gate` steps: this runs fully unattended in CI. (The built-in `speckit`
+# workflow has review-spec / review-plan gates that would hang a headless run.)
+steps:
+  # The constitution defines project-wide PRINCIPLES, not the feature itself, so
+  # it gets a principles-oriented instruction rather than the raw request.
+  - id: constitution
+    command: speckit.constitution
+    integration: copilot
+    input:
+      args: "Establish governing project principles focused on code quality, testing standards, user experience consistency, and performance requirements, plus governance for how these principles guide technical decisions. Context — the project will build: {{ inputs.request }}"
+
+  - id: specify
+    command: speckit.specify
+    integration: copilot
+    input:
+      args: "{{ inputs.request }}"
+
+  - id: clarify
+    command: speckit.clarify
+    integration: copilot
+    input:
+      args: "{{ inputs.request }}"
+
+  - id: plan
+    command: speckit.plan
+    integration: copilot
+    input:
+      args: "{{ inputs.request }}"
+
+  - id: tasks
+    command: speckit.tasks
+    integration: copilot
+    input:
+      args: "{{ inputs.request }}"
+
+  - id: implement
+    command: speckit.implement
+    integration: copilot
+    input:
+      args: "{{ inputs.request }}"
