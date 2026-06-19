@@ -151,6 +151,38 @@ jobs:
       - name: Bootstrap Spec Kit
         run: specify init . --here --force --integration "$SPECIFY_INTEGRATION"
 
+      - name: Diagnose Copilot token
+        # Temporary diagnostic: determines whether the COPILOT_GITHUB_TOKEN that
+        # CI actually sees can perform the Copilot token exchange the CLI relies
+        # on. Prints token TYPE (prefix) and owning ACCOUNT — never the secret
+        # (Actions masks it) and never the minted Copilot token (only HTTP code).
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${COPILOT_GITHUB_TOKEN:-}" ]; then
+            echo "❌ COPILOT_GITHUB_TOKEN secret is EMPTY / not set."; exit 1
+          fi
+          echo "Token length: ${#COPILOT_GITHUB_TOKEN}"
+          echo "Token type (prefix): ${COPILOT_GITHUB_TOKEN%%_*}_   (ghp_=classic PAT, github_pat_=fine-grained, gho_=OAuth, ghs_=app/Actions)"
+
+          echo "--- Which account owns this token? ---"
+          curl -s -H "Authorization: token ${COPILOT_GITHUB_TOKEN}" \
+            https://api.github.com/user \
+            | grep -E '"(login|type)"' || echo "(could not read /user)"
+
+          echo "--- Copilot token exchange (what the CLI actually does) ---"
+          code=$(curl -s -o /tmp/cop.json -w "%{http_code}" \
+            -H "Authorization: token ${COPILOT_GITHUB_TOKEN}" \
+            https://api.github.com/copilot_internal/v2/token)
+          echo "copilot_internal/v2/token -> HTTP ${code}"
+          if [ "${code}" = "200" ]; then
+            echo "✅ Copilot token exchange SUCCEEDED — this token has Copilot access."
+          else
+            echo "❌ Copilot token exchange FAILED. Error body (no secret):"
+            cat /tmp/cop.json; echo ""
+          fi
+
       - name: Run real Spec Kit commands
         # Only the Copilot token is exposed here. The spec-kit commands
         # (constitution → implement) operate on local files and do NOT call the
