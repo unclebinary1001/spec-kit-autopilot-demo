@@ -19,7 +19,7 @@ steps:
   - name: Install spec-kit CLI
     run: uv tool install specify-cli --from "git+https://github.com/github/spec-kit.git"
   - name: Bootstrap spec-kit templates
-    run: specify init . --integration copilot --here --force --no-git
+    run: specify init . --integration copilot --here --force
 permissions:
   contents: read
   issues: read
