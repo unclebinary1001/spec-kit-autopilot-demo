@@ -152,9 +152,12 @@ jobs:
         run: specify init . --here --force --integration "$SPECIFY_INTEGRATION"
 
       - name: Run real Spec Kit commands
+        # Only the Copilot token is exposed here. The spec-kit commands
+        # (constitution → implement) operate on local files and do NOT call the
+        # GitHub API, so GITHUB_TOKEN is intentionally omitted — leaving it set
+        # risks the Copilot CLI resolving the (Copilot-incapable) Actions token.
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SPEC_REQUEST: ${{ steps.context.outputs.spec_request_cli }}
         run: |
           set -euo pipefail
